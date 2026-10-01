@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Réglages de la veille chantiers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --orange:#B4410C; --encre:#1E2124; --gris:#5F646A; --trait:#DEDBD3; --fond:#F4F3EF; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--fond); color:var(--encre); font-family:'IBM Plex Sans','Segoe UI',Helvetica,sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:40px 20px 80px; display:flex; flex-direction:column; gap:20px; }
+  h1 { margin:0; font-size:32px; font-weight:600; line-height:1.2; }
+  h2 { margin:0; font-size:19px; font-weight:600; }
+  .marque { font-size:14px; color:var(--orange); font-weight:600; }
+  .intro { margin:0; font-size:16px; color:#4A4F55; line-height:1.5; }
+  .carte { background:#fff; border:1px solid var(--trait); border-radius:12px; padding:24px; display:flex; flex-direction:column; gap:18px; }
+  .aide { margin:0; font-size:14px; color:var(--gris); line-height:1.5; }
+  label.titre, .titre { font-size:15px; font-weight:500; }
+  .champ { display:flex; flex-direction:column; gap:8px; }
+  input[type=text], input[type=password], select { font:inherit; font-size:16px; padding:11px 14px; border:1px solid #C9C5BB; border-radius:8px; min-height:44px; background:#fff; width:100%; max-width:420px; }
+  .ligne { display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+  .valeur { font-size:22px; font-weight:600; color:var(--orange); }
+  input[type=range] { width:100%; accent-color:var(--orange); height:32px; }
+  .bornes { display:flex; justify-content:space-between; font-size:13px; color:var(--gris); }
+  .pastilles { display:flex; flex-wrap:wrap; gap:10px; }
+  .pastille { font:inherit; font-size:15px; padding:10px 16px; min-height:44px; border-radius:999px; cursor:pointer; background:#fff; color:#3A3F44; border:1px solid #C9C5BB; }
+  .pastille[aria-pressed=true] { background:var(--orange); color:#fff; border-color:var(--orange); font-weight:500; }
+  .case { display:flex; align-items:flex-start; gap:12px; min-height:44px; cursor:pointer; padding:4px 0; }
+  .case input { width:22px; height:22px; accent-color:var(--orange); margin-top:2px; flex-shrink:0; }
+  .case span span { display:block; }
+  .resume { background:#FBF1EA; border:1px solid #E8C9B4; border-radius:12px; padding:24px; }
+  .resume h2 { font-size:17px; color:#6E2A08; margin-bottom:10px; }
+  .resume p { margin:0; font-size:16px; line-height:1.6; color:#3B2414; }
+  .boutons { display:flex; flex-wrap:wrap; align-items:center; gap:14px; }
+  .btn { font:inherit; font-size:16px; font-weight:600; border-radius:8px; padding:13px 24px; min-height:48px; cursor:pointer; }
+  .btn-plein { color:#fff; background:var(--orange); border:none; }
+  .btn-creux { color:var(--orange); background:#fff; border:1px solid var(--orange); }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .message { font-size:15px; font-weight:500; }
+  .ok { color:#1F6B3A; } .erreur { color:#A12020; }
+  details summary { cursor:pointer; font-size:15px; font-weight:500; min-height:32px; }
+  a { color:var(--orange); }
+  #formulaire { display:flex; flex-direction:column; gap:20px; }
+  #formulaire[hidden] { display:none; }
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <div class="marque">Veille chantiers</div>
+    <h1>Tes critères de recherche</h1>
+    <p class="intro">Règle les curseurs et coche ce qui t'intéresse, puis enregistre. Le programme utilisera ces réglages à son prochain passage.</p>
+  </div>
+
+  <section class="carte" id="connexion">
+    <h2>Connexion à ton programme</h2>
+    <p class="aide" id="etat-connexion">À remplir une seule fois sur chaque appareil (ordinateur, téléphone). Ces informations restent enregistrées sur l'appareil.</p>
+    <details id="details-connexion" open>
+      <summary>Informations de connexion</summary>
+      <div style="display:flex;flex-direction:column;gap:14px;margin-top:14px">
+        <div class="champ"><label class="titre" for="c-compte">Ton nom d'utilisateur GitHub</label><input id="c-compte" type="text" autocomplete="username" placeholder="ex. : dupont-tp"></div>
+        <div class="champ"><label class="titre" for="c-depot">Nom du dépôt du programme</label><input id="c-depot" type="text" value="veille-chantiers"></div>
+        <div class="champ"><label class="titre" for="c-cle">Clé d'accès (jeton GitHub)</label><input id="c-cle" type="password" autocomplete="off" placeholder="github_pat_…"></div>
+        <div class="boutons"><button class="btn btn-plein" id="b-connexion" type="button">Se connecter</button><span class="message" id="m-connexion" role="status"></span></div>
+      </div>
+    </details>
+  </section>
+
+  <div id="formulaire" hidden>
+    <section class="carte">
+      <h2>Où chercher</h2>
+      <div class="champ"><label class="titre" for="ville">Ville de départ</label><input id="ville" type="text"></div>
+      <div class="champ">
+        <div class="ligne"><label class="titre" for="distance">Distance maximum</label><span class="valeur" id="v-distance"></span></div>
+        <input id="distance" type="range" min="10" max="150" step="5">
+        <div class="bornes"><span>10 km</span><span>150 km</span></div>
+      </div>
+    </section>
+
+    <section class="carte">
+      <h2>Types de projets</h2>
+      <p class="aide">Clique pour activer ou désactiver.</p>
+      <div class="pastilles" id="types"></div>
+    </section>
+
+    <section class="carte">
+      <h2>Montant minimum</h2>
+      <div class="champ">
+        <div class="ligne"><label class="titre" for="montant">Montant minimum des travaux</label><span class="valeur" id="v-montant"></span></div>
+        <input id="montant" type="range" min="0" max="500000" step="10000">
+        <div class="bornes"><span>Tout</span><span>500 000 €</span></div>
+      </div>
+      <p class="aide">S'applique aux appels d'offres et aux marchés attribués, quand le montant est publié. Les permis de construire n'indiquent pas de montant : ils sont triés uniquement par type de projet.</p>
+    </section>
+
+    <section class="carte">
+      <h2>Travaux qui t'intéressent</h2>
+      <p class="aide">Le programme garde un appel d'offres s'il concerne au moins un de ces travaux.</p>
+      <div class="pastilles" id="travaux"></div>
+    </section>
+
+    <section class="carte">
+      <h2>Ce qu'il faut surveiller</h2>
+      <label class="case"><input type="checkbox" id="s-permis"><span><span class="titre">Permis de construire et d'aménager</span><span class="aide">Les nouveaux projets accordés dans ta zone.</span></span></label>
+      <label class="case"><input type="checkbox" id="s-ao"><span><span class="titre">Appels d'offres en cours</span><span class="aide">Les marchés publics où tu peux encore répondre.</span></span></label>
+      <label class="case"><input type="checkbox" id="s-attrib"><span><span class="titre">Marchés déjà attribués</span><span class="aide">Pour savoir qui a gagné et proposer de la sous-traitance.</span></span></label>
+    </section>
+
+    <section class="carte">
+      <h2>Envoi du rapport Excel</h2>
+      <div class="champ"><label class="titre" for="emails">Adresses qui reçoivent le rapport</label><input id="emails" type="text" placeholder="toi@tonentreprise.fr, collegue@tonentreprise.fr"><p class="aide">Plusieurs adresses possibles, séparées par des virgules.</p></div>
+      <div class="champ"><span class="titre">Jours de prospection</span><p class="aide">Tu peux en choisir plusieurs.</p><div class="pastilles" id="jours"></div></div>
+      <div class="champ"><label class="titre" for="heure">Heure de la prospection</label><p class="aide">Le programme fait sa recherche à cette heure-là (à quelques minutes près), puis t'envoie le rapport.</p><select id="heure" style="max-width:160px"></select></div>
+    </section>
+
+    <section class="resume"><h2>En résumé, le programme cherchera</h2><p id="resume"></p></section>
+
+    <div class="boutons">
+      <button class="btn btn-plein" id="b-enregistrer" type="button">Enregistrer les réglages</button>
+      <button class="btn btn-creux" id="b-lancer" type="button">Lancer une prospection maintenant</button>
+    </div>
+    <span class="message" id="m-action" role="status"></span>
+    <p class="aide">Pour voir si le programme a bien tourné : <a id="lien-actions" href="#" target="_blank" rel="noopener">historique des lancements</a>.</p>
+  </div>
+</main>
+
+<script>
+const JOURS = ["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"];
+let R = null, sha = null, branche = "main";
+const $ = id => document.getElementById(id);
+const conn = () => ({ compte: $("c-compte").value.trim(), depot: $("c-depot").value.trim(), cle: $("c-cle").value.trim() });
+
+function memoire(cle, valeur) {
+  try { if (valeur === undefined) return localStorage.getItem(cle); localStorage.setItem(cle, valeur); } catch (e) { return null; }
+}
+function versBase64(t) { return btoa(unescape(encodeURIComponent(t))); }
+function depuisBase64(t) { return decodeURIComponent(escape(atob(t.replace(/\n/g, "")))); }
+
+async function api(chemin, options = {}) {
+  const c = conn();
+  const r = await fetch(`https://api.github.com/repos/${c.compte}/${c.depot}${chemin}`, {
+    ...options,
+    headers: { "Authorization": `Bearer ${c.cle}`, "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", ...(options.headers || {}) }
+  });
+  if (r.status === 401) throw new Error("Clé d'accès refusée : vérifie-la ou crée-en une nouvelle (elle a peut-être expiré).");
+  if (r.status === 404) throw new Error("Dépôt introuvable : vérifie ton nom d'utilisateur, le nom du dépôt et les autorisations de la clé.");
+  if (r.status === 403) throw new Error("La clé n'a pas les bonnes autorisations (voir le guide d'installation).");
+  if (!r.ok && r.status !== 204) throw new Error(`Erreur GitHub ${r.status}`);
+  return r.status === 204 ? null : r.json();
+}
+
+function message(id, texte, ok) { const m = $(id); m.textContent = texte; m.className = "message " + (ok ? "ok" : "erreur"); }
+
+function pastilles(conteneur, objet, apresClic) {
+  const zone = $(conteneur); zone.innerHTML = "";
+  Object.keys(objet).forEach(k => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "pastille"; b.textContent = k; b.setAttribute("aria-pressed", objet[k] ? "true" : "false");
+    b.onclick = () => { objet[k] = !objet[k]; b.setAttribute("aria-pressed", objet[k] ? "true" : "false"); apresClic(); };
+    zone.appendChild(b);
+  });
+}
+
+function euros(n) { return n.toLocaleString("fr-FR") + " €"; }
+function liste(t) { return t.length > 1 ? t.slice(0, -1).join(", ") + " et " + t[t.length - 1] : (t[0] || ""); }
+
+function resume() {
+  $("v-distance").textContent = R.distance_km + " km";
+  $("v-montant").textContent = R.montant_min ? euros(R.montant_min) : "Tout";
+  const types = Object.keys(R.types).filter(k => R.types[k]).map(s => s.toLowerCase());
+  const trav = Object.keys(R.travaux).filter(k => R.travaux[k]).map(s => s.toLowerCase());
+  const jours = R.envoi.jours;
+  const sources = [R.surveiller.permis && "les permis de construire", R.surveiller.appels_offres && "les appels d'offres en cours", R.surveiller.attribues && "les marchés attribués"].filter(Boolean);
+  $("resume").textContent =
+    `Dans un rayon de ${R.distance_km} km autour de ${R.ville || "[ville]"} : ${sources.length ? liste(sources) : "rien (aucune source cochée)"}. ` +
+    `Types de projets : ${types.length ? types.join(", ") : "aucun"}. ` +
+    `Travaux : ${trav.length ? trav.join(", ") : "aucun"}${R.montant_min ? ", à partir de " + euros(R.montant_min) : ", tout montant"}. ` +
+    (jours.length ? `Prospection et envoi du rapport le${jours.length > 1 ? "s" : ""} ${liste(jours)} à ${R.envoi.heure} h` : "Aucun jour de prospection choisi") +
+    (R.envoi.emails.length ? `, à ${R.envoi.emails.join(", ")}.` : " (aucune adresse : le rapport partira vers l'adresse d'envoi du programme).");
+}
+
+function remplir() {
+  $("ville").value = R.ville; $("distance").value = R.distance_km; $("montant").value = R.montant_min;
+  $("s-permis").checked = R.surveiller.permis; $("s-ao").checked = R.surveiller.appels_offres; $("s-attrib").checked = R.surveiller.attribues;
+  $("emails").value = R.envoi.emails.join(", ");
+  pastilles("types", R.types, resume);
+  pastilles("travaux", R.travaux, resume);
+  const j = {}; JOURS.forEach(x => j[x.charAt(0).toUpperCase() + x.slice(1)] = R.envoi.jours.includes(x));
+  pastilles("jours", j, () => { R.envoi.jours = JOURS.filter(x => j[x.charAt(0).toUpperCase() + x.slice(1)]); resume(); });
+  const h = $("heure"); h.innerHTML = "";
+  for (let i = 5; i <= 21; i++) { const o = document.createElement("option"); o.value = i; o.textContent = i + " h 00"; h.appendChild(o); }
+  h.value = R.envoi.heure;
+  resume();
+}
+
+$("ville").oninput = e => { R.ville = e.target.value; resume(); };
+$("distance").oninput = e => { R.distance_km = Number(e.target.value); resume(); };
+$("montant").oninput = e => { R.montant_min = Number(e.target.value); resume(); };
+$("s-permis").onchange = e => { R.surveiller.permis = e.target.checked; resume(); };
+$("s-ao").onchange = e => { R.surveiller.appels_offres = e.target.checked; resume(); };
+$("s-attrib").onchange = e => { R.surveiller.attribues = e.target.checked; resume(); };
+$("emails").oninput = e => { R.envoi.emails = e.target.value.split(/[,;\s]+/).map(s => s.trim()).filter(s => s.includes("@")); resume(); };
+$("heure").onchange = e => { R.envoi.heure = Number(e.target.value); resume(); };
+
+async function connecter() {
+  const c = conn();
+  if (!c.compte || !c.depot || !c.cle) { message("m-connexion", "Remplis les trois champs.", false); return; }
+  message("m-connexion", "Connexion…", true);
+  try {
+    const depot = await api("");
+    branche = depot.default_branch || "main";
+    const fichier = await api(`/contents/reglages.json?ref=${branche}`);
+    sha = fichier.sha;
+    R = JSON.parse(depuisBase64(fichier.content));
+    R.envoi = R.envoi || { emails: [], jours: [], heure: 7 }; R.envoi.emails = R.envoi.emails || []; R.envoi.jours = R.envoi.jours || [];
+    memoire("vc-compte", c.compte); memoire("vc-depot", c.depot); memoire("vc-cle", c.cle);
+    $("lien-actions").href = `https://github.com/${c.compte}/${c.depot}/actions`;
+    remplir();
+    $("formulaire").hidden = false;
+    $("details-connexion").open = false;
+    $("etat-connexion").textContent = `Connecté au programme ${c.compte}/${c.depot}.`;
+    message("m-connexion", "Connecté.", true);
+  } catch (e) { message("m-connexion", e.message, false); }
+}
+
+$("b-connexion").onclick = connecter;
+
+$("b-enregistrer").onclick = async () => {
+  if (!R.envoi.jours.length && !confirm("Aucun jour de prospection n'est choisi : le programme ne tournera plus automatiquement. Enregistrer quand même ?")) return;
+  $("b-enregistrer").disabled = true; message("m-action", "Enregistrement…", true);
+  try {
+    const rep = await api("/contents/reglages.json", { method: "PUT", body: JSON.stringify({
+      message: "Réglages modifiés depuis la page de réglages", content: versBase64(JSON.stringify(R, null, 2) + "\n"), sha, branch: branche }) });
+    sha = rep.content.sha;
+    message("m-action", "Réglages enregistrés. Ils seront utilisés au prochain passage.", true);
+  } catch (e) {
+    message("m-action", e.message.includes("409") ? "Les réglages ont été modifiés ailleurs entre-temps : recharge la page puis recommence." : e.message, false);
+  }
+  $("b-enregistrer").disabled = false;
+};
+
+$("b-lancer").onclick = async () => {
+  if (!confirm("Lancer une prospection maintenant ? Pense à enregistrer tes réglages avant. Tu recevras le rapport d'ici quelques minutes (jusqu'à 15 minutes la première fois).")) return;
+  $("b-lancer").disabled = true;
+  try {
+    await api("/actions/workflows/veille.yml/dispatches", { method: "POST", body: JSON.stringify({ ref: branche, inputs: { forcer: "oui" } }) });
+    message("m-action", "Prospection lancée. Le rapport arrivera par e-mail dans quelques minutes.", true);
+  } catch (e) { message("m-action", e.message, false); }
+  $("b-lancer").disabled = false;
+};
+
+(function demarrer() {
+  const compte = memoire("vc-compte"), depot = memoire("vc-depot"), cle = memoire("vc-cle");
+  if (compte) $("c-compte").value = compte;
+  if (depot) $("c-depot").value = depot;
+  if (cle) { $("c-cle").value = cle; connecter(); }
+})();
+</script>
+</body>
+</html>
