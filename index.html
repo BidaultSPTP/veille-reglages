@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Réglages de la veille chantiers</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -43,6 +45,9 @@
   .ok { color:#1F6B3A; } .erreur { color:#A12020; }
   details summary { cursor:pointer; font-size:15px; font-weight:500; min-height:32px; }
   a { color:var(--orange); }
+  #carte { height:min(60vh,460px); border-radius:10px; border:1px solid var(--trait); }
+  .leaflet-tooltip { font-family:inherit; font-size:13px; }
+  .pastille.choisie::after { content:" ×"; }
   #formulaire { display:flex; flex-direction:column; gap:20px; }
   #formulaire[hidden] { display:none; }
 </style>
@@ -71,12 +76,22 @@
 
   <div id="formulaire" hidden>
     <section class="carte">
-      <h2>Où chercher</h2>
-      <div class="champ"><label class="titre" for="ville">Ville de départ</label><input id="ville" type="text"></div>
+      <h2>Ta zone de prospection</h2>
+      <p class="aide">Clique sur une communauté de communes pour l'ajouter à ta zone (en orange) ; clique de nouveau pour la retirer. Passe la souris dessus pour voir son nom.</p>
       <div class="champ">
-        <div class="ligne"><label class="titre" for="distance">Distance maximum</label><span class="valeur" id="v-distance"></span></div>
-        <input id="distance" type="range" min="10" max="150" step="5">
-        <div class="bornes"><span>10 km</span><span>150 km</span></div>
+        <span class="titre">Départements affichés sur la carte</span>
+        <div class="pastilles" id="deps-carte"></div>
+      </div>
+      <div id="carte" role="application" aria-label="Carte des communautés de communes"></div>
+      <span class="aide" id="etat-carte" role="status"></span>
+      <div class="champ">
+        <span class="titre" id="titre-choix">Communautés sélectionnées</span>
+        <div class="pastilles" id="choix"></div>
+      </div>
+      <div class="champ">
+        <label class="titre" for="ville">Ville de référence pour les distances</label>
+        <input id="ville" type="text">
+        <p class="aide">Ton siège ou ton dépôt. Elle sert uniquement à calculer la colonne « Distance » du rapport.</p>
       </div>
     </section>
 
@@ -87,13 +102,13 @@
     </section>
 
     <section class="carte">
-      <h2>Montant minimum</h2>
+      <h2>Surface minimum des projets</h2>
       <div class="champ">
-        <div class="ligne"><label class="titre" for="montant">Montant minimum des travaux</label><span class="valeur" id="v-montant"></span></div>
-        <input id="montant" type="range" min="0" max="500000" step="10000">
-        <div class="bornes"><span>Tout</span><span>500 000 €</span></div>
+        <div class="ligne"><label class="titre" for="surface">Surface minimum</label><span class="valeur" id="v-surface"></span></div>
+        <input id="surface" type="range" min="0" max="5000" step="100">
+        <div class="bornes"><span>Tout</span><span>5 000 m²</span></div>
       </div>
-      <p class="aide">S'applique aux appels d'offres et aux marchés attribués, quand le montant est publié. Les permis de construire n'indiquent pas de montant : ils sont triés uniquement par type de projet.</p>
+      <p class="aide">Pour un permis de construire, c'est la surface de plancher créée. Pour un permis d'aménager (lotissement, zone d'activités), c'est la surface du terrain. Les appels d'offres n'indiquent pas de surface : ils sont triés par type de travaux.</p>
     </section>
 
     <section class="carte">
@@ -107,6 +122,17 @@
       <label class="case"><input type="checkbox" id="s-permis"><span><span class="titre">Permis de construire et d'aménager</span><span class="aide">Les nouveaux projets accordés dans ta zone.</span></span></label>
       <label class="case"><input type="checkbox" id="s-ao"><span><span class="titre">Appels d'offres en cours</span><span class="aide">Les marchés publics où tu peux encore répondre.</span></span></label>
       <label class="case"><input type="checkbox" id="s-attrib"><span><span class="titre">Marchés déjà attribués</span><span class="aide">Pour savoir qui a gagné et proposer de la sous-traitance.</span></span></label>
+      <label class="case"><input type="checkbox" id="s-presse"><span><span class="titre">Presse et actualités (Google Alertes)</span><span class="aide">Projets annoncés dans les journaux, croisés avec les sources officielles pour éviter les doublons.</span></span></label>
+    </section>
+
+    <section class="carte" id="carte-presse">
+      <h2>Tes alertes presse</h2>
+      <div class="champ">
+        <label class="titre" for="flux">Adresses des flux Google Alertes</label>
+        <p class="aide">Une adresse par ligne. Elles commencent par https://www.google.com/alerts/feeds/… Pour en créer, va sur <a href="https://www.google.com/alerts" target="_blank" rel="noopener">google.com/alerts</a> et choisis « Envoyer à : Flux RSS » (voir le guide).</p>
+        <textarea id="flux" rows="5" style="font:inherit;font-size:14px;padding:11px 14px;border:1px solid #C9C5BB;border-radius:8px;width:100%;resize:vertical" placeholder="https://www.google.com/alerts/feeds/…"></textarea>
+        <span class="aide" id="v-flux"></span>
+      </div>
     </section>
 
     <section class="carte">
@@ -164,26 +190,34 @@ function pastilles(conteneur, objet, apresClic) {
   });
 }
 
-function euros(n) { return n.toLocaleString("fr-FR") + " €"; }
 function liste(t) { return t.length > 1 ? t.slice(0, -1).join(", ") + " et " + t[t.length - 1] : (t[0] || ""); }
 
 function resume() {
-  $("v-distance").textContent = R.distance_km + " km";
-  $("v-montant").textContent = R.montant_min ? euros(R.montant_min) : "Tout";
+  $("v-flux").textContent = R.flux_presse.length ? R.flux_presse.length + " alerte(s) enregistrée(s)." : "Aucune alerte pour l'instant.";
+  $("carte-presse").style.display = R.surveiller.presse ? "" : "none";
+  $("v-surface").textContent = R.surface_min ? R.surface_min.toLocaleString("fr-FR") + " m²" : "Tout";
   const types = Object.keys(R.types).filter(k => R.types[k]).map(s => s.toLowerCase());
   const trav = Object.keys(R.travaux).filter(k => R.travaux[k]).map(s => s.toLowerCase());
   const jours = R.envoi.jours;
-  const sources = [R.surveiller.permis && "les permis de construire", R.surveiller.appels_offres && "les appels d'offres en cours", R.surveiller.attribues && "les marchés attribués"].filter(Boolean);
+  const sources = [R.surveiller.permis && "les permis de construire", R.surveiller.appels_offres && "les appels d'offres en cours", R.surveiller.attribues && "les marchés attribués", R.surveiller.presse && "la presse"].filter(Boolean);
   $("resume").textContent =
-    `Dans un rayon de ${R.distance_km} km autour de ${R.ville || "[ville]"} : ${sources.length ? liste(sources) : "rien (aucune source cochée)"}. ` +
+    (R.zone.epcis.length
+      ? `Dans ${R.zone.epcis.length} communauté${R.zone.epcis.length > 1 ? "s" : ""} de communes (${R.zone.epcis.map(e => e.nom).join(", ")}) : `
+      : `Aucune communauté de communes choisie : le programme utilise encore l'ancien rayon de ${R.distance_km || 80} km autour de ${R.ville || "[ville]"}. Il surveillera : `) +
+    `${sources.length ? liste(sources) : "rien (aucune source cochée)"}. ` +
     `Types de projets : ${types.length ? types.join(", ") : "aucun"}. ` +
-    `Travaux : ${trav.length ? trav.join(", ") : "aucun"}${R.montant_min ? ", à partir de " + euros(R.montant_min) : ", tout montant"}. ` +
+    `Permis : ${R.surface_min ? "à partir de " + R.surface_min.toLocaleString("fr-FR") + " m²" : "toutes surfaces"}. Travaux recherchés dans les appels d'offres : ${trav.length ? trav.join(", ") : "aucun"}. ` +
     (jours.length ? `Prospection et envoi du rapport le${jours.length > 1 ? "s" : ""} ${liste(jours)} à ${R.envoi.heure} h` : "Aucun jour de prospection choisi") +
     (R.envoi.emails.length ? `, à ${R.envoi.emails.join(", ")}.` : " (aucune adresse : le rapport partira vers l'adresse d'envoi du programme).");
 }
 
 function remplir() {
-  $("ville").value = R.ville; $("distance").value = R.distance_km; $("montant").value = R.montant_min;
+  delete R.montant_min; if (R.surface_min === undefined) R.surface_min = 500;
+  if (R.surveiller.presse === undefined) R.surveiller.presse = false; R.flux_presse = R.flux_presse || [];
+  $("s-presse").checked = R.surveiller.presse; $("flux").value = R.flux_presse.join("\n");
+  $("ville").value = R.ville; $("surface").value = R.surface_min;
+  R.zone = R.zone || {}; R.zone.epcis = R.zone.epcis || [];
+  dessinerChoix();
   $("s-permis").checked = R.surveiller.permis; $("s-ao").checked = R.surveiller.appels_offres; $("s-attrib").checked = R.surveiller.attribues;
   $("emails").value = R.envoi.emails.join(", ");
   pastilles("types", R.types, resume);
@@ -197,11 +231,12 @@ function remplir() {
 }
 
 $("ville").oninput = e => { R.ville = e.target.value; resume(); };
-$("distance").oninput = e => { R.distance_km = Number(e.target.value); resume(); };
-$("montant").oninput = e => { R.montant_min = Number(e.target.value); resume(); };
+$("surface").oninput = e => { R.surface_min = Number(e.target.value); resume(); };
 $("s-permis").onchange = e => { R.surveiller.permis = e.target.checked; resume(); };
 $("s-ao").onchange = e => { R.surveiller.appels_offres = e.target.checked; resume(); };
 $("s-attrib").onchange = e => { R.surveiller.attribues = e.target.checked; resume(); };
+$("s-presse").onchange = e => { R.surveiller.presse = e.target.checked; resume(); };
+$("flux").oninput = e => { R.flux_presse = e.target.value.split(/\s+/).map(s => s.trim()).filter(s => s.startsWith("http")); resume(); };
 $("emails").oninput = e => { R.envoi.emails = e.target.value.split(/[,;\s]+/).map(s => s.trim()).filter(s => s.includes("@")); resume(); };
 $("heure").onchange = e => { R.envoi.heure = Number(e.target.value); resume(); };
 
@@ -220,6 +255,7 @@ async function connecter() {
     $("lien-actions").href = `https://github.com/${c.compte}/${c.depot}/actions`;
     remplir();
     $("formulaire").hidden = false;
+    initCarte();
     $("details-connexion").open = false;
     $("etat-connexion").textContent = `Connecté au programme ${c.compte}/${c.depot}.`;
     message("m-connexion", "Connecté.", true);
@@ -229,6 +265,7 @@ async function connecter() {
 $("b-connexion").onclick = connecter;
 
 $("b-enregistrer").onclick = async () => {
+  if (!R.zone.epcis.length && !confirm("Aucune communauté de communes n'est sélectionnée : le programme continuera d'utiliser l'ancien rayon autour de ta ville. Enregistrer quand même ?")) return;
   if (!R.envoi.jours.length && !confirm("Aucun jour de prospection n'est choisi : le programme ne tournera plus automatiquement. Enregistrer quand même ?")) return;
   $("b-enregistrer").disabled = true; message("m-action", "Enregistrement…", true);
   try {
@@ -251,6 +288,88 @@ $("b-lancer").onclick = async () => {
   } catch (e) { message("m-action", e.message, false); }
   $("b-lancer").disabled = false;
 };
+
+
+// ------------------------------------------------------------------ carte des communautés de communes
+const DEPS = { "22": "Côtes-d'Armor", "29": "Finistère", "35": "Ille-et-Vilaine", "56": "Morbihan", "50": "Manche", "53": "Mayenne", "44": "Loire-Atlantique" };
+let carte = null; const couches = {}; const chargees = {}; const affiches = {};
+
+function estChoisie(code) { return R.zone.epcis.some(e => e.code === code); }
+function styleEpci(code) {
+  return estChoisie(code)
+    ? { color: "#8A3109", weight: 1.5, fillColor: "#B4410C", fillOpacity: 0.45 }
+    : { color: "#6B7076", weight: 1, fillColor: "#FFFFFF", fillOpacity: 0.12 };
+}
+function etatCarte(t) { $("etat-carte").textContent = t; }
+
+function basculer(code, nom, deps) {
+  if (estChoisie(code)) R.zone.epcis = R.zone.epcis.filter(e => e.code !== code);
+  else R.zone.epcis.push({ code, nom, deps: deps || [] });
+  (couches[code] || []).forEach(c => c.setStyle(styleEpci(code)));
+  dessinerChoix(); resume();
+}
+
+function dessinerChoix() {
+  const zone = $("choix"); zone.innerHTML = "";
+  $("titre-choix").textContent = R.zone.epcis.length ? `Communautés sélectionnées (${R.zone.epcis.length})` : "Aucune communauté sélectionnée pour l'instant";
+  R.zone.epcis.slice().sort((a, b) => a.nom.localeCompare(b.nom)).forEach(e => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "pastille choisie"; b.setAttribute("aria-pressed", "true");
+    b.textContent = e.nom; b.title = "Retirer " + e.nom;
+    b.onclick = () => basculer(e.code, e.nom);
+    zone.appendChild(b);
+  });
+}
+
+async function chargerDep(d) {
+  if (chargees[d]) { chargees[d].addTo(carte); return chargees[d]; }
+  etatCarte(`Chargement des communautés de communes : ${DEPS[d]}…`);
+  try {
+    const r = await fetch(`https://geo.api.gouv.fr/epcis?codeDepartement=${d}&format=geojson&geometry=contour&fields=nom,code,codesDepartements`);
+    if (!r.ok) throw new Error();
+    const gj = await r.json();
+    chargees[d] = L.geoJSON(gj, {
+      style: f => styleEpci(f.properties.code),
+      onEachFeature: (f, couche) => {
+        const p = f.properties;
+        couche.bindTooltip(p.nom, { sticky: true });
+        couche.on("click", () => basculer(p.code, p.nom, p.codesDepartements));
+        couche.on("mouseover", () => couche.setStyle({ weight: 3 }));
+        couche.on("mouseout", () => couche.setStyle(styleEpci(p.code)));
+        (couches[p.code] = couches[p.code] || []).push(couche);
+      }
+    }).addTo(carte);
+    etatCarte("");
+    return chargees[d];
+  } catch (e) { etatCarte(`Impossible de charger ${DEPS[d]} pour le moment. Réessaie dans un instant.`); return null; }
+}
+
+function dessinerDeps() {
+  const zone = $("deps-carte"); zone.innerHTML = "";
+  Object.keys(DEPS).forEach(d => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "pastille"; b.textContent = `${d} – ${DEPS[d]}`;
+    b.setAttribute("aria-pressed", affiches[d] ? "true" : "false");
+    b.onclick = async () => {
+      affiches[d] = !affiches[d]; b.setAttribute("aria-pressed", affiches[d] ? "true" : "false");
+      if (affiches[d]) { const c = await chargerDep(d); if (c) carte.fitBounds(c.getBounds(), { padding: [10, 10] }); }
+      else if (chargees[d]) carte.removeLayer(chargees[d]);
+    };
+    zone.appendChild(b);
+  });
+}
+
+async function initCarte() {
+  if (carte) { carte.invalidateSize(); return; }
+  carte = L.map("carte", { scrollWheelZoom: false }).setView([48.3, -2.8], 8);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 14, attribution: "&copy; contributeurs OpenStreetMap · contours : geo.api.gouv.fr" }).addTo(carte);
+  const depart = new Set(R.zone.epcis.flatMap(e => e.deps || []).filter(d => DEPS[d]));
+  if (!depart.size) depart.add("22");
+  depart.forEach(d => affiches[d] = true);
+  dessinerDeps();
+  const faites = (await Promise.all([...depart].map(chargerDep))).filter(Boolean);
+  if (faites.length) carte.fitBounds(L.featureGroup(faites).getBounds(), { padding: [10, 10] });
+}
 
 (function demarrer() {
   const compte = memoire("vc-compte"), depot = memoire("vc-depot"), cle = memoire("vc-cle");
