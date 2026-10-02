@@ -104,11 +104,16 @@
     <section class="carte">
       <h2>Surface minimum des projets</h2>
       <div class="champ">
-        <div class="ligne"><label class="titre" for="surface">Surface minimum</label><span class="valeur" id="v-surface"></span></div>
-        <input id="surface" type="range" min="0" max="5000" step="100">
+        <div class="ligne"><label class="titre" for="plancher">Permis de construire : surface de plancher minimum</label><span class="valeur" id="v-plancher"></span></div>
+        <input id="plancher" type="range" min="0" max="5000" step="100">
         <div class="bornes"><span>Tout</span><span>5 000 m²</span></div>
       </div>
-      <p class="aide">Pour un permis de construire, c'est la surface de plancher créée. Pour un permis d'aménager (lotissement, zone d'activités), c'est la surface du terrain. Les appels d'offres n'indiquent pas de surface : ils sont triés par type de travaux.</p>
+      <div class="champ">
+        <div class="ligne"><label class="titre" for="terrain">Permis d'aménager : surface de terrain minimum</label><span class="valeur" id="v-terrain"></span></div>
+        <input id="terrain" type="range" min="0" max="50000" step="1000">
+        <div class="bornes"><span>Tout</span><span>50 000 m² (5 ha)</span></div>
+      </div>
+      <p class="aide">Le permis d'aménager concerne les lotissements et zones d'activités : c'est la taille du terrain à viabiliser qui compte. Les appels d'offres n'indiquent pas de surface : ils sont triés par type de travaux.</p>
     </section>
 
     <section class="carte">
@@ -195,7 +200,9 @@ function liste(t) { return t.length > 1 ? t.slice(0, -1).join(", ") + " et " + t
 function resume() {
   $("v-flux").textContent = R.flux_presse.length ? R.flux_presse.length + " recherche(s) supplémentaire(s) en plus de la recherche automatique." : "Aucune recherche supplémentaire : seule la recherche automatique est utilisée.";
   $("carte-presse").style.display = R.surveiller.presse ? "" : "none";
-  $("v-surface").textContent = R.surface_min ? R.surface_min.toLocaleString("fr-FR") + " m²" : "Tout";
+  const m2 = n => n ? n.toLocaleString("fr-FR") + " m²" : "Tout";
+  $("v-plancher").textContent = m2(R.surface_min_plancher);
+  $("v-terrain").textContent = m2(R.surface_min_terrain);
   const types = Object.keys(R.types).filter(k => R.types[k]).map(s => s.toLowerCase());
   const trav = Object.keys(R.travaux).filter(k => R.travaux[k]).map(s => s.toLowerCase());
   const jours = R.envoi.jours;
@@ -206,16 +213,19 @@ function resume() {
       : `Aucune communauté de communes choisie : le programme utilise encore l'ancien rayon de ${R.distance_km || 80} km autour de ${R.ville || "[ville]"}. Il surveillera : `) +
     `${sources.length ? liste(sources) : "rien (aucune source cochée)"}. ` +
     `Types de projets : ${types.length ? types.join(", ") : "aucun"}. ` +
-    `Permis : ${R.surface_min ? "à partir de " + R.surface_min.toLocaleString("fr-FR") + " m²" : "toutes surfaces"}. Travaux recherchés dans les appels d'offres : ${trav.length ? trav.join(", ") : "aucun"}. ` +
+    `Permis de construire : ${R.surface_min_plancher ? "à partir de " + R.surface_min_plancher.toLocaleString("fr-FR") + " m² de plancher" : "toutes surfaces"} ; permis d'aménager : ${R.surface_min_terrain ? "à partir de " + R.surface_min_terrain.toLocaleString("fr-FR") + " m² de terrain" : "toutes surfaces"}. Travaux recherchés dans les appels d'offres : ${trav.length ? trav.join(", ") : "aucun"}. ` +
     (jours.length ? `Prospection et envoi du rapport le${jours.length > 1 ? "s" : ""} ${liste(jours)} à ${R.envoi.heure} h` : "Aucun jour de prospection choisi") +
     (R.envoi.emails.length ? `, à ${R.envoi.emails.join(", ")}.` : " (aucune adresse : le rapport partira vers l'adresse d'envoi du programme).");
 }
 
 function remplir() {
-  delete R.montant_min; if (R.surface_min === undefined) R.surface_min = 500;
+  delete R.montant_min;
+  if (R.surface_min_plancher === undefined) R.surface_min_plancher = R.surface_min !== undefined ? R.surface_min : 500;
+  if (R.surface_min_terrain === undefined) R.surface_min_terrain = 5000;
+  delete R.surface_min;
   if (R.surveiller.presse === undefined) R.surveiller.presse = false; R.flux_presse = R.flux_presse || [];
   $("s-presse").checked = R.surveiller.presse; $("flux").value = R.flux_presse.join("\n");
-  $("ville").value = R.ville; $("surface").value = R.surface_min;
+  $("ville").value = R.ville; $("plancher").value = R.surface_min_plancher; $("terrain").value = R.surface_min_terrain;
   R.zone = R.zone || {}; R.zone.epcis = R.zone.epcis || [];
   dessinerChoix();
   $("s-permis").checked = R.surveiller.permis; $("s-ao").checked = R.surveiller.appels_offres; $("s-attrib").checked = R.surveiller.attribues;
@@ -231,7 +241,8 @@ function remplir() {
 }
 
 $("ville").oninput = e => { R.ville = e.target.value; resume(); };
-$("surface").oninput = e => { R.surface_min = Number(e.target.value); resume(); };
+$("plancher").oninput = e => { R.surface_min_plancher = Number(e.target.value); resume(); };
+$("terrain").oninput = e => { R.surface_min_terrain = Number(e.target.value); resume(); };
 $("s-permis").onchange = e => { R.surveiller.permis = e.target.checked; resume(); };
 $("s-ao").onchange = e => { R.surveiller.appels_offres = e.target.checked; resume(); };
 $("s-attrib").onchange = e => { R.surveiller.attribues = e.target.checked; resume(); };
