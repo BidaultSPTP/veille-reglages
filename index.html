@@ -122,14 +122,14 @@
       <label class="case"><input type="checkbox" id="s-permis"><span><span class="titre">Permis de construire et d'aménager</span><span class="aide">Les nouveaux projets accordés dans ta zone.</span></span></label>
       <label class="case"><input type="checkbox" id="s-ao"><span><span class="titre">Appels d'offres en cours</span><span class="aide">Les marchés publics où tu peux encore répondre.</span></span></label>
       <label class="case"><input type="checkbox" id="s-attrib"><span><span class="titre">Marchés déjà attribués</span><span class="aide">Pour savoir qui a gagné et proposer de la sous-traitance.</span></span></label>
-      <label class="case"><input type="checkbox" id="s-presse"><span><span class="titre">Presse et actualités (Google Alertes)</span><span class="aide">Projets annoncés dans les journaux, croisés avec les sources officielles pour éviter les doublons.</span></span></label>
+      <label class="case"><input type="checkbox" id="s-presse"><span><span class="titre">Presse et actualités</span><span class="aide">Le programme cherche automatiquement dans l'actualité les projets de ta zone (départements, communautés de communes, principales villes, bailleurs sociaux), puis les croise avec les sources officielles pour éviter les doublons.</span></span></label>
     </section>
 
     <section class="carte" id="carte-presse">
-      <h2>Tes alertes presse</h2>
+      <h2>Recherches presse supplémentaires (facultatif)</h2>
       <div class="champ">
-        <label class="titre" for="flux">Adresses des flux Google Alertes</label>
-        <p class="aide">Une adresse par ligne. Elles commencent par https://www.google.com/alerts/feeds/… Pour en créer, va sur <a href="https://www.google.com/alerts" target="_blank" rel="noopener">google.com/alerts</a> et choisis « Envoyer à : Flux RSS » (voir le guide).</p>
+        <label class="titre" for="flux">Flux Google Alertes en plus</label>
+        <p class="aide">Inutile pour la recherche courante, qui suit déjà automatiquement ta zone. Sers-t'en seulement pour surveiller un sujet précis (un donneur d'ordre, un concurrent…). Une adresse par ligne, créée sur <a href="https://www.google.com/alerts" target="_blank" rel="noopener">google.com/alerts</a> avec « Envoyer à : Flux RSS ».</p>
         <textarea id="flux" rows="5" style="font:inherit;font-size:14px;padding:11px 14px;border:1px solid #C9C5BB;border-radius:8px;width:100%;resize:vertical" placeholder="https://www.google.com/alerts/feeds/…"></textarea>
         <span class="aide" id="v-flux"></span>
       </div>
@@ -193,7 +193,7 @@ function pastilles(conteneur, objet, apresClic) {
 function liste(t) { return t.length > 1 ? t.slice(0, -1).join(", ") + " et " + t[t.length - 1] : (t[0] || ""); }
 
 function resume() {
-  $("v-flux").textContent = R.flux_presse.length ? R.flux_presse.length + " alerte(s) enregistrée(s)." : "Aucune alerte pour l'instant.";
+  $("v-flux").textContent = R.flux_presse.length ? R.flux_presse.length + " recherche(s) supplémentaire(s) en plus de la recherche automatique." : "Aucune recherche supplémentaire : seule la recherche automatique est utilisée.";
   $("carte-presse").style.display = R.surveiller.presse ? "" : "none";
   $("v-surface").textContent = R.surface_min ? R.surface_min.toLocaleString("fr-FR") + " m²" : "Tout";
   const types = Object.keys(R.types).filter(k => R.types[k]).map(s => s.toLowerCase());
@@ -323,9 +323,11 @@ function dessinerChoix() {
 
 async function chargerDep(d) {
   if (chargees[d]) { chargees[d].addTo(carte); return chargees[d]; }
-  etatCarte(`Chargement des communautés de communes : ${DEPS[d]}…`);
+  etatCarte(`Chargement des communautés de communes : ${DEPS[d]}… (jusqu'à une minute)`);
+  const arret = new AbortController(); const minuteur = setTimeout(() => arret.abort(), 90000);
   try {
-    const r = await fetch(`https://geo.api.gouv.fr/epcis?codeDepartement=${d}&format=geojson&geometry=contour&fields=nom,code,codesDepartements`);
+    const r = await fetch(`https://geo.api.gouv.fr/epcis?codeDepartement=${d}&format=geojson&geometry=contour&fields=nom,code,codesDepartements`, { signal: arret.signal });
+    clearTimeout(minuteur);
     if (!r.ok) throw new Error();
     const gj = await r.json();
     chargees[d] = L.geoJSON(gj, {
@@ -341,7 +343,12 @@ async function chargerDep(d) {
     }).addTo(carte);
     etatCarte("");
     return chargees[d];
-  } catch (e) { etatCarte(`Impossible de charger ${DEPS[d]} pour le moment. Réessaie dans un instant.`); return null; }
+  } catch (e) {
+    clearTimeout(minuteur);
+    etatCarte(`Le service des cartes de l'État n'a pas répondu pour ${DEPS[d]}. Clique deux fois sur son bouton pour réessayer, ou reviens plus tard : tes sélections déjà faites sont conservées.`);
+    affiches[d] = false; dessinerDeps();
+    return null;
+  }
 }
 
 function dessinerDeps() {
